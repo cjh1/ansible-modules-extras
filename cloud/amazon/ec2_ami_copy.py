@@ -69,6 +69,11 @@ options:
       - a hash/dictionary of tags to add to the new copied AMI; '{"key":"value"}' and '{"key":"value","key":"value"}'
     required: false
     default: null
+  public:
+    description:
+      - Make the copied AMI public
+    required: false
+    default: no
 
 author: Amir Moulavi <amir.moulavi@gmail.com>
 extends_documentation_fragment:
@@ -149,6 +154,7 @@ def copy_image(module, ec2):
     tags = module.params.get('tags')
     wait_timeout = int(module.params.get('wait_timeout'))
     wait = module.params.get('wait')
+    public = module.params.get('public')
 
     try:
         params = {'source_region': source_region,
@@ -169,8 +175,16 @@ def copy_image(module, ec2):
 
     register_tags_if_any(module, ec2, tags, image_id)
 
+    if public:
+        make_public(module, ec2, image_id)
+
     module.exit_json(msg="AMI copy operation complete", image_id=image_id, state=img.state, changed=True)
 
+def make_public(module, ec2, image_id):
+    try:
+        ec2.modify_image_attribute(image_id, groups='all')
+    except Exception as e:
+        module.fail_json(msg=str(e))
 
 # register tags to the copied AMI
 def register_tags_if_any(module, ec2, tags, image_id):
@@ -222,7 +236,8 @@ def main():
         kms_key_id=dict(type='str', required=False),
         wait=dict(type='bool', default=False),
         wait_timeout=dict(default=1200),
-        tags=dict(type='dict')))
+        tags=dict(type='dict'),
+        public=dict(type='bool', default=False)))
 
     module = AnsibleModule(argument_spec=argument_spec)
 
